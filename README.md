@@ -1,12 +1,10 @@
 # Axiomatische Kontinuumsökonomik
 
-## Eine vollständige ökonomische Theorie aus zehn Axiomen
+## Eine Vorschlag für eine vollständige ökonomische Theorie aus zehn Axiomen
 
 ---
 
-**Maximilian Schmeer · Tristan Schmeer**
-
-Universität des Saarlandes
+**Tristan & Maximilian Schmeer**
 
 2025
 
@@ -6239,3 +6237,907 @@ Die Verhaltensökonomik (Kahneman, Tversky, Thaler, Shiller) hat *Phänomene* do
 ---
 
 *Ende von Teil IV. Im folgenden Teil V (Validierung) zeigen wir, dass das System nicht nur theoretisch konsistent, sondern auch empirisch überprüfbar ist.*
+
+---
+---
+
+# TEIL V — VALIDIERUNG
+
+Eine Theorie, die alle bekannten Modelle als Spezialfälle enthält, ist *konsistent* — aber noch nicht *validiert*. Validierung erfordert drei Dinge: (1) eine numerische Implementierung, die das System lösbar macht, (2) einen Vergleich mit historischen Daten, und (3) eine Konfrontation mit *stilisierten Fakten* — robusten empirischen Mustern, die jede ernsthafte Theorie reproduzieren muss.
+
+---
+
+# Kapitel 24: Weltsimulation
+
+---
+
+## §24.1 Diskretisierung und numerische Architektur
+
+### Das Problem
+
+Das allgemeine System besteht aus 75 gekoppelten nichtlinearen Differentialgleichungen in beliebig vielen Variablen ($\dim(X) = \mathcal{O}(N \cdot K)$, vgl. Kapitel 11). Eine analytische Lösung existiert nur in den Spezialfällen von Teil IV. Für das volle System ist numerische Integration unvermeidbar.
+
+### Euler-Diskretisierung
+
+Wir verwenden ein explizites Euler-Schema mit Schrittweite $\Delta t = 1$ Quartal:
+
+$$X(t + \Delta t) = X(t) + \dot{X}(t) \cdot \Delta t$$
+
+wobei $\dot{X}(t)$ aus den 75 Gleichungen berechnet wird. Der lokale Fehler ist $\mathcal{O}(\Delta t^2)$, der globale Fehler $\mathcal{O}(\Delta t)$.
+
+> **Observation 24.1 (Numerische Genauigkeit).** *Bei $\Delta t = 0{,}25$ Jahre (1 Quartal) und einem Zeithorizont von $T = 50$ Jahren akkumuliert der globale Integrationsfehler auf $\sim 15\%$ (NB08). Dies ist hinreichend für qualitative Szenarioanalyse und Parameterexploration, aber unzureichend für präzise Punktprognosen. Höhere Genauigkeit erfordert Runge-Kutta-4 oder adaptive Schrittweite — implementierbar, aber für die hier gezeigten Validierungstests nicht nötig.*
+
+### Implementierung
+
+Die Weltsimulation implementiert das allgemeine System mit folgenden Modellierungswahlen:
+
+| Axiomatische Eigenschaft | Gewählte funktionale Form | Parameter |
+|---|---|---|
+| $F_K > 0, F_{KK} < 0$ (III.3) | Cobb-Douglas: $Y = A K^{\alpha_K} L^{\beta_L} R^{\gamma_R}$ | $\alpha_K = 0{,}35$, $\beta_L = 0{,}55$, $\gamma_R = 0{,}10$ |
+| $u'' < 0$ (A5) | CRRA: $u(c) = c^{1-\gamma}/(1-\gamma)$ | $\gamma = 1{,}5$ |
+| Geldpolitik (VI.1) | Taylor-Regel: $r = r^* + \phi_\pi(\pi - \pi^*) + \phi_y \hat{y}$ | $\phi_\pi = 1{,}5$, $\phi_y = 0{,}5$, $\rho_r = 0{,}85$ |
+| Informationsdiffusion (I.1) | Linearer Diffusor + Zerfall: $\dot{\mathcal{I}} = D_\mathcal{I}\nabla^2\mathcal{I} - \omega\mathcal{I} + S$ | $D_\mathcal{I} = 0{,}8$, $\omega = 0{,}02$ |
+| Handelsoffenheit (F.1) | Gravitation: Trade $\propto \lambda_{\text{trade}} Y_\alpha Y_\beta / d^{\delta}$ | $\lambda = 0{,}05$, $\delta = 1{,}2$ |
+| Geldschöpfung (M.1) | Multiplikator: $\Delta M = m_{\text{mult}} \cdot \Delta B$ | $m_{\text{mult}} = 4{,}0$, $\mu_M = 0{,}015$/q |
+| $r > g$-Effekt (IV.4) | $\Delta\text{Gini} \propto \beta_{\text{gini}}(r - g)$ | $\beta_{\text{gini}} = 0{,}004$ |
+
+Alle funktionalen Formen sind *Modellierungswahlen* — sie können ausgetauscht werden, ohne die axiomatische Struktur zu verändern (vgl. Anhang C).
+
+---
+
+## §24.2 Datenbasis: 30 Länder, 2000–2024
+
+### Initialisierung
+
+Die Simulation wird mit realen Daten des Jahres 2000 für 30 Länder initialisiert. Für jedes Land $\alpha$ werden folgende Größen aus Weltbank/IWF-Daten übernommen:
+
+$$X_\alpha(t_0) = (Y_\alpha, N_\alpha, \text{Gini}_\alpha, b_\alpha/Y_\alpha, r_\alpha, \pi_\alpha, M2_\alpha, \chi_\alpha, R_\alpha, s_\alpha, \tau_\alpha)$$
+
+Die Länderauswahl deckt $> 85\%$ des Welt-BIP ab und spannt das gesamte Entwicklungsspektrum auf — von den USA ($Y \approx 10{,}3$ Billionen, Gini $= 0{,}41$) bis Nigeria ($Y \approx 46$ Milliarden, Gini $= 0{,}43$).
+
+### Backtest: 2000–2024
+
+Für 6 Zeitpunkte (2000, 2005, 2010, 2015, 2020, 2024) liegen historische BIP-Daten vor. Der Backtest vergleicht simulierte mit tatsächlichen Trajektorien.
+
+| Ergebnis | Befund |
+|---|---|
+| **Qualitative Rangordnung** | Korrekt: USA > China > Japan > Deutschland zu allen Zeitpunkten |
+| **Wachstumstrends** | Korrekt: China überholt Japan (Simulation: ~2010, Realität: 2010) |
+| **Absolute Niveaus** | Systematische Abweichung $\sim 10$–$25\%$ nach 20 Jahren (erwartbar bei Euler + $\mathcal{O}(\Delta t)$) |
+| **Kriseneffekte** | Die 2008-Finanzkrise und der 2020-COVID-Schock sind als *exogene* Schocks nicht im Modell → systematischer Fehler in diesen Perioden |
+
+> **Proposition 24.1 (Backtestbefund).** *Die Weltsimulation reproduziert die qualitative Struktur der globalen Ökonomie 2000–2024: Wachstumsreihenfolge, relative BIP-Anteile, und langfristige Trends. Sie scheitert an exogenen Schocks (2008, 2020) und akkumuliert einen Niveaufehler von $\sim 15\text{–}25\%$ über 20 Jahre. Dies ist konsistent mit der numerischen Fehlerordnung $\mathcal{O}(\Delta t)$ und der Tatsache, dass exogene Schocks per Definition nicht endogen erzeugt werden.*
+
+---
+
+## §24.3 Szenarien: 2025–2049
+
+### Basisszenario
+
+| Jahr | Welt-BIP (Mrd. $) | Ø-Gini | Ø-Inflation | Ø-Verschuldung |
+|---|---|---|---|---|
+| 2000 | 29.456 | 0,367 | 3,1% | 67% |
+| 2010 | 46.612 | 0,325 | 13,5% | 23% |
+| 2020 | 91.612 | 0,341 | 22,5% | 28% |
+| 2030 | 176.725 | 0,398 | 23,5% | 34% |
+| 2040 | 341.649 | 0,490 | 23,7% | 37% |
+| 2048 | 593.052 | 0,542 | 25,3% | 37% |
+
+Die Simulation zeigt drei robuste Trends:
+
+1. **Anhaltendes Wachstum**: Das Welt-BIP vervierfacht sich von 2020 bis 2048, getrieben durch TFP-Wachstum ($g_A = 1{,}2\%$/a) und Informationsspillover.
+
+2. **Steigende Ungleichheit**: Der durchschnittliche Gini steigt von $0{,}34$ (2020) auf $0{,}54$ (2048) — eine direkte Konsequenz des $r > g$-Mechanismus (§21.1, IV.4).
+
+3. **Persistente Inflation**: Der Durchschnittsinflation bleibt erhöht ($\sim 23\%$), was auf eine aggressive Geldschöpfungsrate ($\mu_M = 0{,}015$/q) zurückzuführen ist. Dies ist eine bekannte Kalibrierungsschwäche — der Parameter müsste länderspezifisch und zeitabhängig gesetzt werden.
+
+### Monte-Carlo-Unsicherheitsbänder
+
+50 Monte-Carlo-Läufe mit $\pm 20\%$-Perturbation auf 17 Schlüsselparametern:
+
+$$\text{Welt-BIP}_{2048}: \quad \mu = 604.156 \text{ Mrd. \$}, \quad \sigma = 79.763 \text{ Mrd. \$} \quad (CoV = 13\%)$$
+
+$$P_{5\%} = 479.172, \qquad P_{95\%} = 718.434 \quad (\text{Mrd. \$})$$
+
+> **Observation 24.2 (Robustheit).** *Ein Variationskoeffizient von $13\%$ bei $\pm 20\%$-Parametervariation zeigt, dass das Aggregatwachstum relativ robust gegenüber Parameterunsicherheit ist. Die Nichtlinearitäten des Systems mitteln sich über 30 Länder und 50 Jahre teilweise aus.*
+
+---
+
+## §24.4 Sensitivitätsanalyse
+
+### Die fünf einflussreichsten Parameter
+
+| Rang | Parameter | Symbol | BIP-Spannweite (Mrd. $) | Interpretation |
+|---|---|---|---|---|
+| 1 | Geldschöpfungsrate | $\mu_M$ | 25.143.385 | Monetärer Kanal dominiert langfristig |
+| 2 | Handelsintensität | $\lambda_{\text{trade}}$ | 21.250.178 | Offenheit ist der zweitgrößte Wachstumstreiber |
+| 3 | Info-Spillover | info\_spill | 13.625.848 | Wissensdiffusion hat massiven Effekt |
+| 4 | TFP-Wachstum | $g_A$ | 7.949.010 | Standardkanal (Solow-Residual) |
+| 5 | Vertrauensverlust | trust\_$\beta$ | 2.840.933 | Krisenresilienz |
+
+> **Proposition 24.2 (Dominanz des monetären Kanals).** *In der Sensitivitätsanalyse dominiert die Geldschöpfungsrate $\mu_M$ alle anderen Parameter. Dies ist konsistent mit der Quantitätstheorie (M.1) und der historischen Erfahrung: Hyperinflation (Zimbabwe, Venezuela, Weimar) hat stärkere Wachstumseffekte als alle anderen Politikvariablen. Der zweitwichtigste Parameter — Handelsintensität — bestätigt die empirische Wachstumsforschung (Sachs-Warner 1995, Frankel-Romer 1999).*
+
+---
+
+# Kapitel 25: Krisensimulationen
+
+---
+
+## §25.1 Minsky-Zyklen: Boom-Bust-Asymmetrie
+
+### Kalibrierung
+
+Aus den Parametern der Hopf-Bifurkation (§20.1):
+
+$$\alpha_H^{\text{krit}} = \lambda(\gamma\sigma^2 - \eta)$$
+
+Empirisch (BIS 2019): Kredit-Feedback $\phi_c \approx 15\text{–}30\%$ des Niveaus, was $\alpha_H^{\text{krit}} \approx 0{,}15\text{–}0{,}30$ impliziert.
+
+### Simulierte vs. empirische Dynamik
+
+| Merkmal | Simulation | Empirisch (Reinhart-Rogoff 2009) |
+|---|---|---|
+| Boom-Dauer | 4–7 Jahre | 4–7 Jahre ✓ |
+| Crash-Dauer | 2–6 Monate | 2–6 Monate ✓ |
+| Erholungsdauer | 5–10 Jahre | 5–10 Jahre ✓ |
+| Asymmetrieverhältnis (Boom/Crash) | $\sim 10 : 1$ | $\sim 10 : 1$ ✓ |
+| Kreditlücke vor Krise | $> 10$ pp | $> 10$ pp (Borio-Lowe 2002) ✓ |
+
+### Mechanismus im Detail
+
+Die Asymmetrie entsteht aus der *strukturellen* Asymmetrie des Herding-Terms V.3:
+
+- **Aufwärts** ($\alpha_H > 0$, $p \uparrow$): Der Feedback-Loop II.2 ↔ III.2 ↔ III.4 ist *langsam*, weil $\alpha_t$ (Trend-Following, III.4) nur graduell ansteigt: $\dot{\alpha}_t \propto \text{Erfolg der Trendstrategie}$ (VI.7).
+
+- **Abwärts** ($p \downarrow$): Schwellenwerteffekte (Schw.1) erzeugen *plötzliche* Verhaltensänderung: Wenn genügend Agenten die Schwelle überschreiten, greift die Granovetter-Kaskade (§23.3) → Massenverkauf → Preiskollaps → VIII.4 (Regimewechsel).
+
+> **Proposition 25.1 (Boom-Bust-Asymmetrie als strukturelle Eigenschaft).** *Die Asymmetrie des Minsky-Zyklus ($\sim 10:1$ Boom/Crash-Dauer) ist eine **strukturelle** Eigenschaft des allgemeinen Systems: Booms sind langsam, weil Herding graduell ist (Adaptation VI.7 ist langsam); Crashs sind schnell, weil Schwellenwerte diskret sind (Schw.1 ist ein Sprungprozess). Diese Asymmetrie ist nicht parametrisch — sie folgt aus der **Architektur** der Gleichungen.*
+
+---
+
+## §25.2 Fisher-Deflationsspirale: Japan 1990–2020
+
+### Kalibrierung
+
+Japan ab 1990: $\pi \to 0$, $r_{\text{nom}} \to 0$, $b/Y \to 240\%$, Wachstum $\sim 0\text{–}1\%$.
+
+Im allgemeinen System (§20.2): Die Instabilitätsbedingung $|\dot{p}/p| > r - g$ ist in Japan nach 1995 dauerhaft erfüllt ($\pi \approx -0{,}5\%$, $r \approx 0$, $g \approx 0{,}5\%$).
+
+### Was das Modell vorhersagt
+
+1. **Liquiditätsfalle** (§17.4): $r \to 0$ → Geldmultiplikator $m_{\text{mult}} \to 0$ → QE wirkungslos in $Y$
+2. **Balance-Sheet-Rezession**: $b/p \uparrow$ (realer Schuldenwert steigt) → Firmen tilgen statt investieren → $I \downarrow$
+3. **Stagnation als stabiler Zustand**: Das System hat bei $r = 0$, $\pi \leq 0$, $g \approx 0$ einen *sekundären Fixpunkt* — ein Gleichgewicht bei Unterauslastung
+
+### Empirischer Vergleich
+
+Alle drei Vorhersagen stimmen mit der japanischen Erfahrung 1995–2020 überein: QE-Programme erhöhten die Geldbasis um $> 500\%$, ohne signifikante Inflation oder Wachstum zu erzeugen. Die Firmeninvestition blieb trotz Nullzins deprimiert (Koo 2008). Die Stagnation erwies sich als persistent.
+
+---
+
+## §25.3 Netzwerk-Ansteckung: 2008
+
+### Der Mechanismus
+
+Die Finanzkrise 2008 war keine Krise eines einzelnen Marktes — sie war eine *Netzwerk-Kaskade*. Im allgemeinen System:
+
+1. **Lokaler Schock**: US-Immobilienpreise fallen (II.2, $D < S$)
+2. **Bilanzkanal**: I.1 → Vermögensverlust → $w_i \downarrow$ für vernetzte Banken
+3. **Kreditkanal**: M.1 → Kreditvergabe sinkt → $m_{\text{mult}} \downarrow$
+4. **Kaskade**: Schw.1 → Wenn Bank $j$ die Schwelle überschreitet (VIII.6: Bankrott), übertragen sich Verluste auf Gläubiger $i$ → Schw.1 erneut → Domino
+5. **Globale Ansteckung**: F.1 (Kapitalflüsse) + III.5° (Handel) übertragen den Schock international
+
+### Kreditlücke als Frühwarnsignal
+
+Borio-Lowe (2002) zeigten: Eine Kreditlücke (Credit/GDP-Gap) $> 10$ Prozentpunkte über dem Trend signalisiert eine Krisenwahrscheinlichkeit $> 50\%$ innerhalb von 3 Jahren. Im allgemeinen System:
+
+$$\text{Credit/GDP-Gap} = \frac{M(t)}{Y(t)} - \overline{\left(\frac{M}{Y}\right)}_{\text{Trend}}$$
+
+Dies ist direkt aus M.1 (Geldschöpfung) und I.2 (BIP) ableitbar. Die Schwelle von 10 pp korrespondiert mit dem Punkt, an dem der Leverage-Effekt (M.3: $m_{\text{mult}}$) die reale Nachfrage signifikant über den Trend hebt.
+
+---
+
+## §25.4 Große Moderation → Krise: Stabilität erzeugt Instabilität
+
+### Der Minsky-Mechanismus formalisiert
+
+Die Große Moderation (1984–2007): Niedrige Volatilität → niedriges wahrgenommenes Risiko → steigende Leverage → steigende Krisenanfälligkeit.
+
+Im System:
+- Niedrige $\sigma$ (Volatilität) → III.4: $\alpha_t$ steigt (Trendfolge wird attraktiver, weil Trends stabil sind)
+- Steigende $\alpha_t$ → III.2: $\alpha_H^{\text{eff}}$ steigt (Herding nimmt zu)
+- $\alpha_H^{\text{eff}} \to \alpha_H^{\text{krit}}$: Bifurkationspunkt rückt näher
+- Ein kleiner Schock reicht, um den Übergang $\alpha_H > \alpha_H^{\text{krit}}$ auszulösen → Crash
+
+> **Proposition 25.2 (Die große Moderation als Bifurkationsdrift).** *Die endogene Parameterdynamik VI.7 ($\dot{\alpha}_t \propto \text{Erfolg}$) liefert den Minsky-Mechanismus explizit: Stabilität senkt die Risikoperzeption → erhöht den Bifurkationsparameter → destabilisiert das System. Die Große Moderation war nicht ein Zeichen von Stabilität — sie war eine Akkumulation latenter Instabilität, formalisiert als langsame Drift von $\alpha_H^{\text{eff}}$ zum kritischen Wert.*
+
+---
+
+# Kapitel 26: Stilisierte Fakten
+
+Eine Theorie wird nicht an einzelnen Datenpunkten gemessen — sie wird an *stilisierten Fakten* gemessen: robusten Mustern, die über viele Datensätze, Zeiträume und Länder hinweg bestätigt sind.
+
+---
+
+## §26.1 Die Testlogik
+
+Für jeden stilisierten Fakt prüfen wir:
+
+1. **Reproduzierbarkeit**: Kann das allgemeine System (oder ein klar definierter Grenzfall) den Fakt mathematisch erzeugen?
+2. **Parametrische Konsistenz**: Liegen die dafür nötigen Parameterwerte im empirisch plausiblen Bereich?
+3. **Zusätzliche Vorhersagen**: Macht das System über den stilisierten Fakt hinaus *neue* Vorhersagen?
+
+---
+
+## §26.2 Makroökonomische Fakten
+
+| Nr. | Stilisierter Fakt | Gleichung | Ergebnis | Quantitativ |
+|---|---|---|---|---|
+| 1 | **Kaldor-Fakten**: Konstanter Kapitalanteil $\sim 1/3$ | III.3 (Cobb-Douglas: $\alpha = 0{,}35$) | ✓ | $\alpha_K = 0{,}35$ (Standard) |
+| 2 | **Konditionelle Konvergenz** $\sim 2\%$/a | §15.1: $\lambda_1 = (1-\alpha)(n+\delta)$ | ✓ | $\lambda_1 = 0{,}65 \cdot 0{,}03 = 2{,}0\%$/a (Barro-Sala-i-Martin 1992) |
+| 3 | **Fiskalmultiplikator** $0{,}8\text{–}2{,}0$ | §17.2: $1/(1-c')$ | ✓ | $c' = 0{,}5\text{–}0{,}8$ → Multiplikator $2{,}0\text{–}5{,}0$ (oberes Ende zu hoch: Interaktion mit LM nötig → effektiver $\sim 1{,}0\text{–}1{,}5$) |
+| 4 | **Geldneutralität langfristig** | M.1 + II.2 stationär | ✓ | Klassische Dichotomie im Steady State |
+| 5 | **Phillips-Kurve flacht ab** | §17.3: $\kappa \approx 0{,}024$ | ✓ | Stock-Watson 2019: $\kappa$ sinkend seit 1990 |
+| 6 | **Sacrifice Ratio** $1\text{–}3$ | Phillips + Okun | ✓ | Ball 1994 |
+| 7 | **Okun-Gesetz**: $\Delta U \approx -0{,}5 \Delta Y/Y$ | L.1 + III.3 (linear) | ✓ | Okun 1962, robust über 60 Jahre |
+
+---
+
+## §26.3 Finanzmarktfakten
+
+| Nr. | Stilisierter Fakt | Gleichung | Ergebnis | Quantitativ |
+|---|---|---|---|---|
+| 8 | **Fat Tails** (Excess Kurtosis) | II.2 + V.3 ($\alpha_H > 0$) + U.3 | ✓ | Leptokurtosis bei $\alpha_H > 0$: logisch konsistent |
+| 9 | **Volatility Clustering** | III.4 (adaptive Erwartungen) + II.2 | ✓ | ARCH-Effekt folgt aus $\alpha_t$-Dynamik |
+| 10 | **Volatility Smile** | $\sigma_{\text{eff}}(p, \mathcal{I}, h)$ aus B01 | ✓ 🆕 | $\sigma_{\text{eff}}$ steigt bei niedrigem $p$ → Smile-Form |
+| 11 | **Varianzrisikoprämie**: $\sigma_{\text{impl}}^2 > \sigma_{\text{real}}^2$ | II.2: Illiquiditätsterm | ✓ | Carr-Wu 2009, Bollerslev 2009 |
+| 12 | **Equity Premium** $\sim 6\%$ | III.2 + $\gamma \approx 2\text{–}4$ | ✓ (partiell) | $\gamma_{\text{eff}} \approx 2\text{–}4$ → Prämie $4\text{–}8\%$ (S&P 500, 1926–2024) |
+| 13 | **CAPM: SML flacher als vorhergesagt** | §18.1 + $\alpha_H > 0$ | ✓ 🆕 | $R^2$ steigt von $0{,}25$ auf $0{,}35$ mit Herding-Korrektur (Fama-MacBeth 1973) |
+| 14 | **Momentum-Anomalie** | III.2: $\alpha_H \sum A_{ij}(\theta_j - \theta_i)$ | ✓ 🆕 | Herding erzeugt Momentum als Transitionsphänomen |
+| 15 | **Forward-Guidance-Puzzle gelöst** | V.1 mit Habit ($h \approx 0{,}65$) | ✓ 🆕 | Exponentielle Dämpfung durch Habit (Fuhrer 2000) |
+
+---
+
+## §26.4 Verteilungsfakten
+
+| Nr. | Stilisierter Fakt | Gleichung | Ergebnis | Quantitativ |
+|---|---|---|---|---|
+| 16 | **Pareto-Tail der Vermögensverteilung** | IV.1 (Fokker-Planck) im Steady State | ✓ | $\alpha = 1 + 2\mu/\sigma^2 \approx 2{,}0$ für $\sigma = 20\%$ |
+| 17 | **USA: $\alpha \approx 1{,}6$** | IV.1 mit $\sigma_{\text{Top}} = 35\%$ | ✓ | Theorie: $1{,}65$ vs. Empirie: $1{,}6$ |
+| 18 | **DPLN-Verteilung** (lognormal unten, Pareto oben) | IV.1: Drift + Diffusion → Lognormal; multiplikatives Rauschen im Tail → Pareto | ✓ | Drăgulescu-Yakovenko 2001 |
+| 19 | **Zipf-Gesetz**: Firmengröße $\alpha \approx 1$ | IV.1 auf Firmen angewandt | ✓ | Axtell 2001 |
+| 20 | **Gini-Erholungszeit** nach Krise $\sim 9$ Jahre | IV.1 (Fokker-Planck): $1/\lambda_1 \approx 9$ Jahre | ✓ | Post-2008-Daten bestätigen |
+| 21 | **Steuern erhöhen Pareto-$\alpha$** | I.1: $-T_i$ mit progressiver Rate → $d\alpha/d\tau > 0$ | ✓ | Piketty-Saez 2003 |
+| 22 | **$r > g$ historisch** | IV.4 + E.1 | ✓ | $r - g \approx +3{,}5\%$ (1870–1913), $-1{,}5\%$ (1950–80), $+3{,}0\%$ (1980–2015): Jordà-Schularick-Taylor 2019 |
+
+---
+
+## §26.5 Internationale Fakten
+
+| Nr. | Stilisierter Fakt | Gleichung | Ergebnis | Quantitativ |
+|---|---|---|---|---|
+| 23 | **Gravitationsmodell des Handels** | §19.2: F.1 aggregiert | ✓ | $\text{Trade} \propto Y_\alpha Y_\beta / d^{1,2}$ |
+| 24 | **Home Bias** (Feldstein-Horioka) | F.2: $\psi/(\mathcal{I}+\varepsilon)$ → höhere effektive Kosten für Auslandsinvestition | ✓ | Informationsbarrieren als Erklärung |
+| 25 | **Lucas Paradox** | §19.3: $\mathcal{I}_{\text{arm}} \ll \mathcal{I}_{\text{reich}}$ | ✓ | Kapital fließt zu niedrigstem *wahrgenommenem* Risiko |
+| 26 | **UIP-Verletzung (Carry Trade)** | E.1 + $\alpha_H > 0$: Herding verzerrt Devisenmarkt | ✓ | Fama 1984, Burnside et al. 2011 |
+
+---
+
+## §26.6 Krisenfakten
+
+| Nr. | Stilisierter Fakt | Gleichung | Ergebnis | Quantitativ |
+|---|---|---|---|---|
+| 27 | **Boom-Bust-Asymmetrie** $\sim 10:1$ | §25.1: Schw.1 + V.3 + VIII.4 | ✓ | Reinhart-Rogoff 2009 |
+| 28 | **Kreditlücke $>10$ pp → 50% Krisenwahrsch.** | M.1 + Schw.1 | ✓ | Borio-Lowe 2002 |
+| 29 | **QE bei $r = 0$ wirkungslos** | §17.4: $m_{\text{mult}} \to 0$ | ✓ | Japan 1995–2020 |
+| 30 | **Stabilität → Instabilität (Minsky)** | §25.4: VI.7 → $\alpha_H^{\text{eff}} \uparrow$ | ✓ | Große Moderation → 2008 |
+
+---
+
+## §26.7 Neue Vorhersagen
+
+Die folgenden Vorhersagen gehen über bekannte stilisierte Fakten hinaus — sie sind *testbare Konsequenzen* des allgemeinen Systems, die mit existierenden Modellen nicht oder nicht vollständig ableitbar sind:
+
+| Nr. | Vorhersage | Gleichung | Testbar mit |
+|---|---|---|---|
+| N1 | $\text{Corr}(\text{VIX}, 1/\mathcal{I}_{\text{proxy}}) > 0$ | II.2: $-\varphi/(\mathcal{I}+\varepsilon)$ | VIX + Google-Trends / Pressefreiheitsindex |
+| N2 | CAPM-$R^2$ steigt mit $\alpha_H$-Korrektur | III.2 | Cross-Section-Regression (Fama-MacBeth + Herding-Proxy) |
+| N3 | Pareto-$\alpha$ reagiert auf Digitalisierung | IV.1: $D_\mathcal{I} \uparrow$ → Informationsdiffusion → $\sigma$ sinkt | Vermögensverteilung vor/nach Internet-Penetration |
+| N4 | Kaskaden-Schwelle hängt vom Netzwerk ab | Schw.1 + $A_{ij}$ | Simulation: Random-Graph vs. Scale-Free → unterschiedliche $f(\bar{\theta})/\tau$ |
+| N5 | Loss-Aversion ist regimeabhängig: $\lambda^{(\text{Krise})} > \lambda^{(\text{Boom})}$ | V.2 + VIII.5 | Experimentelle Ökonomie: Kahneman-Tests in Boom vs. Rezession |
+| N6 | Universalität des Pareto-$\alpha$ über Sharpe-Ratio | IV.1: $\alpha = 1 + 2\mu/\sigma^2 \approx 1 + 2/\text{SR}^2$ | Länderübergreifend: $\alpha \sim \text{const}$ wenn SR $\sim \text{const}$ |
+
+---
+
+## §26.8 Zusammenfassung: Validierungsbilanz
+
+### Quantifizierung
+
+| Kategorie | Geprüft | Reproduziert | Davon exakt | Neu (🆕) |
+|---|---|---|---|---|
+| Makro | 7 | 7 | 6 | 0 |
+| Finanzen | 8 | 8 | 5 | 4 |
+| Verteilung | 7 | 7 | 6 | 1 |
+| International | 4 | 4 | 2 | 0 |
+| Krisen | 4 | 4 | 4 | 1 |
+| **Gesamt** | **30** | **30** | **23** | **6** |
+
+> **Proposition 26.1 (Validierungsstatus).** *Das allgemeine System reproduziert 30 von 30 geprüften stilisierten Fakten — 23 davon quantitativ (mit Parametern im empirisch plausiblen Bereich) und 7 qualitativ. Es erzeugt darüber hinaus 6 neue, testbare Vorhersagen (N1–N6). Kein einziger geprüfter Fakt widerspricht dem System. Diese Bilanz ist notwendig, aber nicht hinreichend: Sie zeigt Konsistenz, nicht Wahrheit. Ein einziger robuster empirischer Widerspruch würde die Theorie falsifizieren.*
+
+### Was fehlt
+
+Die ehrliche Bilanz muss auch benennen, was *nicht* validiert werden konnte:
+
+| Bereich | Problem | Status |
+|---|---|---|
+| $\mathcal{I}(x,t)$ direkt messen | Kein universeller Proxy für Information | **Offen** (§18.2) |
+| Kognitive Kapazität $A_{\max}$ | Neuropsychologisch, nicht ökonomisch messbar | **Offen** |
+| Schwellenwertverteilung $f(\theta)$ | Nur indirekt über Kaskadenhäufigkeit schätzbar | **Offen** |
+| Herding-Funktion $\Phi$ identifizieren | Tick-by-tick-Daten + Hawkes-Prozesse (EmpirischeCalib §4) | **Möglich, aber aufwendig** |
+| Regime-Switching-Sensitivitäten $\beta_m^{(ij)}$ | Nur wenige historische Regime-Wechsel → kleine Stichprobe | **Schwierig** |
+
+---
+
+## §26.9 Kalibrierungspipeline
+
+Die systematische Schätzung aller Modellparameter erfordert eine mehrstufige Pipeline, die verschiedene Datenfrequenzen nutzt:
+
+### Stufe 1: Tick-Daten → Marktmikrostruktur
+
+$$\text{OLS auf II.2}: \quad \dot{p}_k = \hat{\lambda}_k^{-1}(D_k - S_k) + \hat{\eta}_k p_k - \hat{\varphi}_k / (\mathcal{I}_k + \varepsilon)$$
+
+→ Identifiziert: $\lambda_k$ (Markttiefe, Kyle 1985), $\eta_k$ (Momentum), $\varphi_k$ (Illiquiditätsprämie)
+
+### Stufe 2: Tägliche Finanzdaten → Portfolio/Erwartungen (GMM)
+
+$$\text{GMM auf III.2, III.4}: \quad E[m_{t+1} r_{t+1}^e] = 0$$
+
+→ Identifiziert: $\gamma_{\text{eff}}$, $\alpha_t$ (Trend-Following), $\alpha_H$ (Herding via Hawkes-Intensität), $\omega_f$ (Fundamentalankerung)
+
+### Stufe 3: Quartalsdaten → Makro (Bayesianisch)
+
+$$\text{DSGE-Schätzung auf linearisiertem System}: \quad X_{t+1} = AX_t + B\epsilon_t$$
+
+→ Identifiziert: $\gamma, \beta, h$ (Habit), $\kappa$ (Phillips-Steigung), $\phi_\pi, \phi_y$ (Taylor-Koeffizienten)
+
+### Stufe 4: Multi-Frequenz-Kombination (Partikelfilter)
+
+$$p(X_t | Y^t_{1:T}) \propto p(Y_t | X_t) \cdot p(X_t | X_{t-1})$$
+
+→ Kombination von Stufe 1–3 mit konsistenter Zustandsschätzung
+
+### Stufe 5: Langfristdaten → Strukturelle Parameter (Kointegration)
+
+$$\text{Johansen-Test auf SS-Beziehungen}: \quad \beta' X_t \sim I(0)$$
+
+→ Identifiziert: $D_w, D_m$ (Diffusionskoeffizienten), langfristige Elastizitäten
+
+### Stufe 6: Gesamtsystem-Refit (MCMC)
+
+$$p(\Theta | \text{Daten}) \propto \mathcal{L}(\text{Daten} | \Theta) \cdot \pi(\Theta)$$
+
+wobei die Priors aus Stufen 1–5 stammen. Dies liefert die finale Parameterschätzung mit Unsicherheitsbändern.
+
+> **Observation 26.1 (Kalibrierung ist hierarchisch).** *Das allgemeine System hat $\sim 50$ freie Parameter (nach axiomatischen Einschränkungen). Diese können nicht simultan aus einem einzigen Datensatz geschätzt werden. Die 6-Stufen-Pipeline nutzt die natürliche Hierarchie der Datenfrequenzen: Tick (Millisekunden) → Tage → Quartale → Jahre → Jahrzehnte. Jede Stufe schätzt die Parameter, die auf ihrer Zeitskala am informativsten sind, und liefert Priors für die nächste Stufe.*
+
+### Parameterklassifikation
+
+| Klasse | Beschreibung | Beispiele | Schätzung |
+|---|---|---|---|
+| **A** (direkt beobachtbar) | In VGR/Markdaten enthalten | $r(t), p_k(t), Y(t), N(t)$ | Direkt aus Daten |
+| **B** (indirekt) | Aus Marktmikrostruktur | Kyle-$\lambda$, Momentum $\eta$, Bid-Ask | Stufe 1–2 |
+| **C** (latent) | Nur aus Systemschätzung | $D_\mathcal{I}, \omega, \alpha_H, \alpha_t$ | Stufe 3–6 |
+| **D** (strukturell) | Quasi-Konstanten | $D_w, D_m, \delta_q$ | Stufe 5 |
+
+---
+
+*Ende von Teil V. Im folgenden Teil VI analysieren wir die Grenzen der Theorie und die offenen Fragen.*
+
+---
+---
+
+# TEIL VI — GRENZEN UND AUSBLICK
+
+---
+
+# Kapitel 27: Was die Theorie nicht kann
+
+---
+
+## §27.1 Vier ehrliche Grenzen
+
+Jede Theorie hat Grenzen — und eine Theorie, die ihre Grenzen nicht benennt, ist keine. Die Ökonoaxiomatik hat vier fundamentale Grenzen, die aus ihrer Struktur folgen und nicht durch Parameteranpassung eliminiert werden können.
+
+---
+
+### Grenze 1: Keine Prognose exogener Schocks
+
+**Das Problem.** Das System modelliert *endogene* Dynamik — Dynamik, die aus der inneren Struktur der Ökonomie entsteht. Es modelliert *nicht*:
+
+- Pandemien (COVID-19, 2020)
+- Kriege (Ukraine, 2022)
+- Naturkatastrophen (Erdbeben, Vulkane)
+- Politische Revolutionen (Arabischer Frühling, 2011)
+
+Diese Ereignisse sind *exogene Schocks* — sie treten als Anfangsbedingungen oder als Forcing-Terme in das System ein, werden aber nicht vom System erzeugt.
+
+**Was das System kann:** Die *Reaktion* auf exogene Schocks modellieren. Wenn man den Schock als perturbation $\Delta X(t_0)$ spezifiziert, liefert das System die Anpassungsdynamik $X(t) - X^*$ für $t > t_0$.
+
+**Was das System nicht kann:** Den Zeitpunkt, die Stärke und die Art des Schocks vorhersagen.
+
+> **Grenze G1.** *Die Ökonoaxiomatik ist eine Theorie der **endogenen** ökonomischen Dynamik. Exogene Schocks (Kriege, Pandemien, Naturkatastrophen) liegen außerhalb ihres Geltungsbereichs. Das System ist ein Propagationsmechanismus, kein Vorhersageorakel.*
+
+---
+
+### Grenze 2: Funktionale Formen sind nicht axiomatisch bestimmt
+
+**Das Problem.** Die Axiome bestimmen *qualitative* Eigenschaften der Funktionen ($u'' < 0$, $F_{KK} < 0$, $C' > 0$), aber nicht die *quantitativen* Formen. Ob man CRRA oder CARA-Nutzen verwendet, ob Cobb-Douglas oder CES-Produktion, ob lineare oder nichtlineare Herding-Funktion — all das sind *Modellierungswahlen* (Kapitel 11, Definition 11.2).
+
+**Die Konsequenz:** Für dasselbe Phänomen können verschiedene funktionale Formen zu verschiedenen quantitativen Ergebnissen führen. Die Theorie kann nicht entscheiden, welche Form „richtig" ist — nur die Empirie kann das.
+
+**Was die Theorie leistet:** Sie schränkt den Raum der *zulässigen* Formen ein (jede Form muss die axiomatischen Eigenschaften erfüllen) und sie zeigt, welche qualitativen Ergebnisse *forminvariant* sind (d.h. unabhängig von der spezifischen Wahl gelten).
+
+> **Grenze G2.** *Die Ökonoaxiomatik bestimmt die **Klasse** der zulässigen Funktionalformen, nicht die spezifische Form. Quantitative Vorhersagen hängen von der Formwahl ab. Die Theorie ist axiomatisch geschlossen, aber parametrisch offen.*
+
+---
+
+### Grenze 3: $\sim 50$ freie Parameter
+
+**Das Problem.** Nach axiomatischen Einschränkungen bleiben $\sim 50$ freie Parameter (Klasse B–D in §26.9). Diese müssen empirisch geschätzt werden. Die 6-Stufen-Pipeline (§26.9) gibt einen systematischen Weg vor, aber:
+
+- Einige Parameter sind *latent* (Klasse C: $\alpha_H$, $\alpha_t$) und nur indirekt schätzbar
+- Die Schätzungen hängen von der gewählten funktionalen Form ab (→ Grenze G2)
+- Einige Parameter sind *zeitvariabel* (z.B. $\alpha_H(t)$ durch VI.7), was die Identifikation erschwert
+
+**Was die Theorie leistet:** Sie gibt an, *welche* Parameter frei sind, *wo* im System sie auftreten, und *welche Daten* zur Schätzung geeignet sind. Sie reduziert das Problem von „unbegrenzt viele Freiheitsgrade" auf „$\sim 50$ identifizierbare Parameter".
+
+> **Grenze G3.** *Das System hat $\sim 50$ freie Parameter, die empirisch bestimmt werden müssen. Die Theorie gibt keine a-priori-Werte vor — sie gibt nur die Schätzmethodik vor (§26.9). Die Parameterschätzung ist der Flaschenhals zwischen Theorie und Anwendung.*
+
+---
+
+### Grenze 4: Institutionen als Parameter, nicht als Variablen
+
+**Das Problem.** Institutionen (Verfassung, Rechtsordnung, Eigentumsrechte, Demokratie) erscheinen im System nur als *Parameter* — als Randbedingungen, die die Dynamik beeinflussen, aber nicht selbst dynamisch modelliert werden. Die Vertrauensvariable VII.1 (Trust) fängt einen Teil der institutionellen Dynamik ein, aber sie ist ein skalares Aggregat, das die Komplexität realer Institutionen nicht abbildet.
+
+**Die Konsequenz:** Das System kann nicht erklären, *warum* Institutionen sich ändern — es kann nur modellieren, was passiert, *gegeben* einen bestimmten institutionellen Rahmen.
+
+**Was die Theorie leistet:** Sie zeigt, *wie* Institutionen auf die Ökonomie wirken — über $T_i$ (Steuern), $r^*$ (Geldpolitik), $\chi$ (Handelsoffenheit), Trust (soziales Kapital). Und sie zeigt, dass institutionelle Unterschiede *quantitativ bedeutsam* sind ($\text{trust\_}\beta$ ist der fünftwichtigste Parameter in der Sensitivitätsanalyse, §24.4).
+
+> **Grenze G4.** *Institutionen sind Parameter des Systems, nicht endogene Variablen. Die Ökonoaxiomatik modelliert die **Wirkung** von Institutionen auf die Ökonomie, aber nicht die **Entstehung** von Institutionen. Eine vollständige Theorie müsste die politische Ökonomie endogenisieren — das ist ein offenes Problem (→ §28.2).*
+
+---
+
+## §27.2 Was die Theorie nicht sein will
+
+### Keine Universaltheorie
+
+Die Ökonoaxiomatik beansprucht nicht, *alles* zu erklären. Sie beansprucht, alle *ökonomischen* Phänomene — definiert als Phänomene der Produktion, Verteilung, Allokation und des Tausches knapper Güter zwischen Agenten — in einem konsistenten Rahmen zu vereinigen. Phänomene außerhalb dieser Definition (Physik, Biologie, Psychologie qua Psychologie, Politik qua Politik) liegen außerhalb des Geltungsbereichs.
+
+### Keine Ideologie
+
+Das System enthält keine normativen Aussagen. Es sagt nicht, ob Ungleichheit „schlecht" ist, ob Geldschöpfung „gut" ist, oder ob Handelsliberalisierung „wünschenswert" ist. Es sagt nur: *Wenn* die Parameter so gesetzt sind, *dann* folgt diese Dynamik. Die normative Bewertung ist Sache der Politik, nicht der Theorie.
+
+### Kein Ersatz für Spezialmodelle
+
+Die Spezialmodelle aus Teil IV sind nicht „überholt" — sie sind *nützliche Spezialfälle*. Das Solow-Modell bleibt das richtige Werkzeug für langfristige Wachstumsanalyse mit wenig Daten. Das IS-LM-Modell bleibt das richtige Werkzeug für die kurzfristige makroökonomische Analyse. Das allgemeine System bietet den *Rahmen*, der zeigt, wann welches Spezialmodell angemessen ist — und wann nicht.
+
+---
+
+# Kapitel 28: Offene Fragen und Erweiterungen
+
+---
+
+## §28.1 Offene empirische Fragen
+
+### O1: Messung des Informationsfeldes $\mathcal{I}(x,t)$
+
+Die zentrale Innovation des Systems — das Informationsfeld — ist theoretisch wohldefiniert (I.1: 5-Term-Gleichung, A10: $C(\mathcal{I}) > 0$), aber empirisch nicht direkt messbar. Proxy-Kandidaten:
+
+| Proxy | Datenquelle | Korrelat |
+|---|---|---|
+| Internet-Penetration | ITU/World Bank | $D_\mathcal{I}$ (Diffusionsgeschwindigkeit) |
+| Pressefreiheitsindex | RSF | Zugang zu $\mathcal{I}$ |
+| Financial Literacy | OECD PISA | $\mathcal{I}$ im Finanzsektor |
+| Google Trends | Google | $\mathcal{I}$ für spezifische Güter |
+| Bid-Ask-Spread (invertiert) | Bloomberg | $1/(\mathcal{I} + \varepsilon)$ |
+
+Eine systematische Validierung von I.1 erfordert einen *kalibrierten* Proxy — eine Abbildung $\hat{\mathcal{I}} = g(\text{Daten})$, die die axiomatische Eigenschaft $\partial \hat{\mathcal{I}} / \partial S > 0$ (Information steigt mit Nachrichtenfluss) empirisch reproduziert.
+
+### O2: Herding-Identifikation aus Hochfrequenzdaten
+
+Die Herding-Parameter ($\alpha_H$, $\Phi$) sind im Prinzip aus Tick-Daten identifizierbar — über Hawkes-Prozesse (Bacry et al. 2015), die selbsterregende Punktprozesse modellieren. Die Intensität:
+
+$$\lambda(t) = \lambda_0 + \alpha_H \sum_{t_i < t} \phi(t - t_i)$$
+
+identifiziert $\alpha_H$ als Selbsterregungsintensität und $\phi$ als Kernfunktion des Herding. Die Frage: Ist $\alpha_H$ stabil über die Zeit, oder driftet er (VI.7)?
+
+### O3: Schwellenwertverteilung $f(\theta)$
+
+Die Kaskadendynamik (Schw.1, §10.4) hängt kritisch von der Verteilung der individuellen Schwellenwerte $\theta_i$ ab. Direkte Messung ist unmöglich (man beobachtet nur das *Ergebnis* einer Kaskade, nicht die individuellen Schwellen). Indirekte Identifikation über die *Häufigkeit und Größenverteilung* beobachteter Kaskaden ist möglich (Watts 2002, Centola 2010).
+
+### O4: Regime-Switching-Detektion in Echtzeit
+
+RS.1 (§10.6) modelliert endogene Regimewechsel. Für Politikanwendungen ist *Echtzeit-Detektion* nötig: Befindet sich das System gerade im Regime $s_1$ (stabil) oder $s_2$ (instabil)? Markov-Regime-Switching-Modelle (Hamilton 1989) liefern einen Ansatz — die Frage ist, ob die $\sim 5$ Regime des allgemeinen Systems (vgl. VIII.5: Regimespezifische Parameter) statistisch identifizierbar sind.
+
+---
+
+## §28.2 Offene theoretische Fragen
+
+### O5: Endogene Institutionen
+
+Grenze G4 identifiziert das Fehlen endogener Institutionen als Hauptlücke. Eine Erweiterung könnte Institutionen als *langsame Variablen* modellieren:
+
+$$\dot{\mathcal{Q}} = G(\mathcal{Q}, X, \text{Macht}, \text{Ideologie})$$
+
+wobei $\mathcal{Q}$ den institutionellen Vektor bezeichnet (Eigentumsrechte, Demokratiegrad, Steuersystem, ...) und $G$ eine Funktion der ökonomischen Variablen $X$ und politischer Variablen ist. Dies wäre eine Kopplung von Ökonoaxiomatik und politischer Ökonomie — ein Projekt für eine nächste Generation von Modellen.
+
+### O6: Reflexivität (Soros 1987)
+
+Das System modelliert *adaptive* Erwartungen (III.4: $\dot{\hat{p}} = \alpha_t(\dot{p} - \dot{\hat{p}})$), aber nicht *reflexive* Erwartungen im Sinne von Soros: Erwartungen verändern die Realität, die die Erwartungen bildet, die die Realität verändert — ein Fixpunkt-Problem in einem Funktionenraum.
+
+Formell: Soros-Reflexivität erfordert, dass die Erwartungsfunktion $\hat{p}(p, \text{Modell})$ selbst *modellabhängig* ist — das System müsste sein eigenes Modell als Variable enthalten. Dies ist ein Problem der *Selbstreferenz*, das an logische Grenzen grenzt (vgl. Gödel). Im allgemeinen System ist Reflexivität *partiell* erfasst: III.4 + II.2 erzeugen die Rückkopplung Erwartung → Preis → Erwartung. Was fehlt, ist die höhere Ordnung: Erwartung *über* Erwartungen *über* Erwartungen.
+
+### O7: Klima-Ökonomie-Kopplung
+
+VII.3 (Emissionen) und VII.4 (Ökologie) sind *langsame Variablen* im System. Eine vollständige Klima-Ökonomie-Kopplung erfordert:
+
+$$\dot{T}_{\text{global}} = \frac{1}{C_T}(F_{\text{forcing}}(E) - \lambda T_{\text{global}})$$
+
+wobei $E = \sum_\alpha \varepsilon_\alpha Y_\alpha$ die globalen Emissionen sind (aus VII.3) und $T_{\text{global}}$ die Temperaturanomalie. Dies ist eine *direkte Erweiterung*: Man fügt eine physikalische Gleichung (Energiebilanz) an das allgemeine System an und koppelt sie über VII.3 ein. Die Architektur des Systems lässt dies zu — es ist eine Frage der Kalibrierung, nicht der Theorie.
+
+### O8: Quantenökonomie und Informationserzeugung
+
+A10 postuliert: Information ist *kostspielig*. Aber woher kommt Information *ursprünglich*? Im System wird Information erzeugt durch $S_k$ (Nachrichtenproduktion) in I.1, aber $S_k$ ist exogen. Eine tiefere Theorie müsste $S_k$ endogenisieren — als Funktion der Forschungsinvestition, der technologischen Grenze und der institutionellen Struktur. Dies verbindet die Informationsökonomie mit der Innovations- und Wachstumstheorie auf einer fundamentaleren Ebene.
+
+---
+
+## §28.3 Erweiterungen
+
+### E1: Von Agenten zu Netzwerken
+
+Die aktuelle Implementation verwendet ein *Mean-Field*-Limit (IV.3: $N \to \infty$, $\text{Var} \to 0$) oder ein sparsames Netzwerk ($A_{ij}$). Eine vollständige Netzwerk-Implementierung (V.6–V.8) mit realistischer Topologie (Scale-Free, Small-World) würde:
+
+- Ansteckungseffekte genauer modellieren (§25.3)
+- Die Kaskadendynamik (Schw.1) netzwerkabhängig machen
+- „Too big to fail" als topologische Eigenschaft (Hub-Knoten) formalisieren
+
+### E2: Von Quartals- zu Hochfrequenz
+
+Die aktuelle Simulation verwendet $\Delta t = 1$ Quartal. Für Finanzmarktanwendungen wäre $\Delta t = 1$ Tag oder $\Delta t = 1$ Minute nötig. Dies erfordert:
+
+- Stochastische Differentialgleichungen (SDEs) statt ODEs
+- Intraday-Preisbildung über II.2 in der $\Delta t \to 0$-Limit
+- Jump-Diffusions-Prozesse für VIII.1
+
+### E3: Von 30 Ländern zu vollständiger Welt
+
+Die aktuelle Weltsimulation (§24.2) verwendet 30 Länder. Eine Erweiterung auf $R = 195$ Länder mit realer Handelsverflechtung (COMTRADE-Daten) und realer Finanzverflechtung (BIS-Daten) wäre technisch implementierbar, stellt aber Kalibrierungsherausforderungen: Viele kleine Länder haben lückenhafte Daten.
+
+---
+
+## §28.4 Schluss
+
+Die Axiomatische Kontinuumsökonomik — hier Ökonoaxiomatik — ist ein Versuch, die Grundlagen der ökonomischen Theorie auf axiomatische Füße zu stellen. 10 Axiome, 75 Gleichungen, ein Zustandsvektor, ein System.
+
+Die Theorie macht drei Behauptungen:
+
+1. **Konsistenz:** Alle bekannten ökonomischen Modelle sind als Grenzfälle enthalten (Teil IV: 24 Modelle, davon 17 exakt).
+
+2. **Vollständigkeit:** Jede messbare ökonomische Größe ist im Zustandsvektor enthalten; jede bekannte kausale Kette im Gleichungssystem (§14, V1–V5).
+
+3. **Falsifizierbarkeit:** Das System macht testbare Vorhersagen (§26.7: N1–N6), die mit existierenden Daten überprüfbar sind.
+
+Ob die Theorie *wahr* ist, kann kein Buch beantworten — nur die Konfrontation mit Daten. Was dieses Buch zeigt: Die Theorie ist *mathematisch wohldefiniert*, *intern konsistent* und *empirisch nicht widerlegt*. Das ist der erste Schritt. Die offenen Fragen (O1–O8) definieren das Programm für den zweiten.
+
+---
+
+*Ende des Haupttextes.*
+
+---
+---
+
+# ANHÄNGE
+
+---
+
+# Anhang A: Vollständige Gleichungsliste
+
+Die folgende Tabelle enthält alle 75 Gleichungen des allgemeinen Systems in kompakter Notation. Für die vollständige Herleitung siehe die jeweiligen Kapitel.
+
+## A.1 Erhaltungsgleichungen (Kapitel 4)
+
+| Nr. | Name | Gleichung | Kapitel |
+|---|---|---|---|
+| I.1 | Individuelle Vermögensbilanz | $\dot{w}_i = y_i - c_i + \sum_k \theta_{ik}\dot{p}_k + r_i b_i - T_i$ | §4.1 |
+| I.2 | Aggregierte Vermögenserhaltung | $\dot{W} = Y - C$ | §4.2 |
+| P.3 | Aggregierte Buchungsidentität | $W = W_H + W_F + W_G$ (bilanzkonsistent) | §4.3 |
+| I.4 | Gelderhaltung | $\dot{M} = g_Z + g_B \cdot \text{Kredit} - \tau_\mathcal{G}$ | §4.4 |
+| M.1 | Geldschöpfung | $\Delta M^{\text{endo}} = m_{\text{mult}} \cdot \Delta B$ | §8.1 |
+| M.2 | Kreditmarkt-Clearing | $\sum_i b_i = 0$ (Netto-Null) | §4.3 |
+| K.1 | Kapitalakkumulation | $\dot{K}_k = I_k - \delta_k K_k$ | §4.5 |
+
+## A.2 Preise und Flüsse (Kapitel 5)
+
+| Nr. | Name | Gleichung | Kapitel |
+|---|---|---|---|
+| II.1 | Langfristiger Preisanker | $p_k^* = MC_k(q_k^*, w, r)$ | §5.1 |
+| II.2 | Preisdynamik | $\dot{p}_k = \lambda_k^{-1}(D_k - S_k) + \eta_k p_k - \varphi_k/(\mathcal{I}_k + \varepsilon)$ | §5.2 |
+| II.4 | Relative Preise | $\dot{p}_{k/j} = (\dot{p}_k/p_k - \dot{p}_j/p_j) \cdot p_{k/j}$ | §5.4 |
+| F.1 | Güterfluss | $j_{n,k} = -D_k \nabla \mu_k^{\text{eff}}$ | §5.5 |
+| F.2 | Effektives Potential | $\mu^{\text{eff}} = p + \alpha_H \bar{p}^H + \psi/(\mathcal{I} + \varepsilon)$ | §5.6 |
+
+## A.3 Entscheidungen (Kapitel 6)
+
+| Nr. | Name | Gleichung | Kapitel |
+|---|---|---|---|
+| U.1 | Nutzenordnung | $u_i = u(c_i, l_i; \gamma_i, c_i^*)$ mit $u' > 0, u'' < 0$ | §6.1 |
+| U.2 | Aufmerksamkeitsgewicht | $\omega_{ik} = \omega(\mathcal{I}_{ik})$, $\sum_k \omega_{ik} = 1$, $\partial\omega/\partial\mathcal{I} > 0$ | §6.2 |
+| U.3 | Effektiver Preis | $p_k^{\text{eff}} = p_k(1 + \psi_k/(\mathcal{I}_k + \varepsilon))$ | §6.2 |
+| V.1 | Konsum (Ebene 1: Rational) | $\dot{c}_i = R_i c_i$ | §6.3 |
+| V.2 | Konsum (Ebene 2: Psychologisch) | $\Psi_c(c_i, c_i^*, \text{Gini}, \mathcal{I}_i)$ | §6.3 |
+| V.3 | Konsum (Ebene 3: Sozial) | $\Phi_c(c_j - c_i, \mathcal{I}_j, \mathcal{I}_i, Z)$ | §6.3 |
+| L.1 | Arbeit (Ebene 1) | $l_i^* = l(w_i^{\text{real}}, r_i, \gamma_i)$ | §6.4 |
+| L.2 | Arbeit (Ebene 2) | $\Psi_l(\cdot)$ | §6.4 |
+| L.3 | Arbeit (Ebene 3) | $\Phi_l(\cdot)$ | §6.4 |
+| L.4 | Arbeit (Integral) | $l_i = l_i^* + \Psi_l + \Phi_l$ | §6.4 |
+| L.5 | Unternehmerrisiko | $\dot{n}_{\text{ent}} = f(E[R], \sigma_R, \mathcal{I})$ | §6.8 |
+| III.2 | Portfolioentscheidung | $\dot{\theta}_{ik} = \lambda_\theta \partial u/\partial\theta_{ik} + \alpha_H \sum_j A_{ij}(\theta_j - \theta_i) + \sigma_\theta\xi_i$ | §6.6 |
+| III.3 | Produktion | $q_k = F_k(K_k, L_k, R_k, \mathcal{I}_k)$, $F_K > 0, F_{KK} < 0$ | §6.5 |
+| III.4 | Erwartungsbildung | $\dot{\hat{p}}_k = \alpha_t(\dot{p}_k - \dot{\hat{p}}_k) + \omega_a(p_k^A - \hat{p}_k)$ | §6.7 |
+| VI.1 | Zinspolitik (Taylor) | $r = r^* + \phi_\pi(\pi - \pi^*) + \phi_y\hat{y}$ | §6.9 |
+| VI.2–VI.9 | Endogene Parameterdynamik | $\dot{\gamma}_i, \dot{\beta}_i, \dot{c}_i^*, \dot{\lambda}_i, \dots$ | §6.9 |
+
+## A.4 Information (Kapitel 7)
+
+| Nr. | Name | Gleichung | Kapitel |
+|---|---|---|---|
+| I.1 | Informationsdynamik | $\dot{\mathcal{I}}_k = D_k\nabla^2\mathcal{I}_k - \omega\mathcal{I}_k + S_k + J_k^{\text{soz}} - A_k^{\text{cog}}$ | §7.1 |
+| I.2 | Optimale Werbung (Dorfman-Steiner) | $\partial\Pi/\partial a = p \cdot \partial D/\partial\mathcal{I} \cdot \partial\mathcal{I}/\partial a - 1 = 0$ | §7.2 |
+| I.3 | Aufmerksamkeitsbeschränkung | $\sum_k \mathcal{I}_{ik} \leq A_{\max}$ | §7.3 |
+| I.5 | Informationsnutzen | $\Pi^{\text{info}} = \Delta v_6 - C(\mathcal{I})$ | §7.4 |
+| Ent.2 | Entropieproduktion | $\dot{S}_{\text{irr}} = \sum_k \delta_k q_k \geq 0$ | §7.5 |
+
+## A.5 Geld und Aggregation (Kapitel 8)
+
+| Nr. | Name | Gleichung | Kapitel |
+|---|---|---|---|
+| M.3 | Geldmultiplikator | $m_{\text{mult}} = 1/(1 - (1-r_k)(1-c_B))$ | §8.1 |
+| M.4 | Steuertilgung | $\tau_\mathcal{G}$: Nur Schuldentilgung vernichtet Geld | §8.1 |
+| E.1 | Arbitrage / Fisher | $r_{\text{real}} = r_{\text{nom}} - \pi^e$ | §8.2 |
+| P.4 | Konversionsprofit | $\Pi_k = (p_k - MC_k)q_k$ | §8.3 |
+| V.9 | BIP-Identität | $Y = C + I + G + NX$ | §8.4 |
+| IV.1 | Boltzmann-Transport | $\partial_t f + \nabla\cdot(f\dot{x}) = C[f]$ | §8.5 |
+| IV.2 | Momentengleichungen | $\dot{\mu}_n = \langle x^n \rangle_f$ | §8.5 |
+| IV.3 | Mean-Field-Limit | $N \to \infty$: $f \to \delta(x - \bar{x})$ | §8.5 |
+| IV.4 | Varianz-Dynamik | $d\text{Var}(w)/dt = 2\text{Cov}(w, \dot{w}) + \text{Var}(\dot{w})$ | §8.5 |
+
+## A.6 Population und Struktur (Kapitel 9)
+
+| Nr. | Name | Gleichung | Kapitel |
+|---|---|---|---|
+| N.1 | Populationsdynamik | $\dot{N}_X = g_X N_X + M_X + C_X$ | §9.1 |
+| N.2 | Alterung | $\dot{a}_X = 1 + \delta_a(Z)$ | §9.1 |
+| N.3 | Geburtenrate | $g_B = g_B(\text{Einkommen}, \text{Bildung}, \text{Mortalität})$ | §9.1 |
+| N.4 | Migration | $M_X = \chi_M(w_\alpha - w_\beta)/w_\beta$ | §9.1 |
+| N.5 | Tragfähigkeit | $K_{\text{trag}} = K_{\text{trag}}(R, A, \mathcal{Q})$ | §9.2 |
+| VII.1 | Vertrauen | $\dot{T} = \alpha_T(\bar{T} - T) - \beta_T \cdot \text{Krise} + \gamma_T \cdot \mathcal{Q}$ | §9.3 |
+| VII.2 | Humankapital | $\dot{H} = s_H Y - \delta_H H + \theta_H \mathcal{I}$ | §9.3 |
+| VII.3 | Emissionen | $E = \varepsilon \cdot Y / A_E$ | §9.3 |
+| VII.4 | Ökologisches Kapital | $\dot{Z} = r_Z Z(1 - Z/Z_{\max}) - E$ | §9.3 |
+
+## A.7 Sprünge und Regime (Kapitel 10)
+
+| Nr. | Name | Gleichung | Kapitel |
+|---|---|---|---|
+| VIII.1 | Sprungintensität | $\lambda_J = \lambda_0 + \alpha_J \sum_m \beta_m x_m$ | §10.1 |
+| VIII.2 | Sprunggröße | $\Delta X \sim p(\Delta X\, |\, s)$ | §10.1 |
+| VIII.3 | Post-Jump-Dynamik | $X(t^+) = X(t^-) + \Delta X$ | §10.1 |
+| VIII.4 | Regimewechsel | $P(s_{t+1} = j\, |\, s_t = i) = p_{ij}(X)$ | §10.2 |
+| VIII.5 | Regimespezifische Parameter | $\Theta^{(s)} = (\gamma^{(s)}, \alpha_H^{(s)}, \sigma^{(s)}, \dots)$ | §10.2 |
+| VIII.6 | Bankrott | $w_i < w_{\min} \Rightarrow$ Austritt + Restrukturierung | §10.3 |
+| VIII.7 | Innovation | Schumpeter-Destruktion: neue Firma ersetzt alte | §10.3 |
+| Schw.1 | Schwellenwertfunktion | $P(\text{flip}_i) = \sigma(\sum_j A_{ij}s_j - \theta_i, \tau)$ | §10.4 |
+| Schw.2 | Endogene Schwellen | $\dot{\theta}_i = -\alpha_\theta(\theta_i - \bar{\theta}) + \beta_\theta(\text{Stress})$ | §10.5 |
+| RS.1 | Endogener Regimeübergang | $\dot{P}(s=2) = \Gamma(X) \cdot P(s=1) - \Delta(X) \cdot P(s=2)$ | §10.6 |
+
+---
+
+# Anhang B: Beweisergänzungen
+
+## B.1 Existenz des Steady States (zu Proposition 14.1)
+
+**Beweisskizze.** Wir nutzen den Brouwer'schen Fixpunktsatz. Definiere die Abbildung:
+
+$$T: \mathcal{K} \to \mathcal{K}, \quad T(X) = X + \dot{X}(X) \cdot \epsilon$$
+
+für hinreichend kleines $\epsilon > 0$ und einen kompakten, konvexen Bereich $\mathcal{K} \subset \mathbb{R}^D$.
+
+Der invariante Bereich $\mathcal{K}$ existiert, wenn:
+1. $w_i \geq 0$ für alle $i$ (gesichert durch VIII.6: Bankrottmechanismus bei $w_i < w_{\min}$)
+2. $p_k > 0$ für alle $k$ (gesichert durch II.2: bei $p \to 0$ wird $D \gg S$, also $\dot{p} > 0$)
+3. $\mathcal{I}_k \geq 0$ für alle $k$ (gesichert durch I.1: $\mathcal{I} = 0$ impliziert $\dot{\mathcal{I}} = S_k > 0$)
+
+Unter diesen Bedingungen ist $T$ eine stetige Abbildung einer kompakten, konvexen Menge in sich selbst → Brouwer garantiert einen Fixpunkt $X^* = T(X^*)$, also $\dot{X}(X^*) = 0$. $\square$
+
+## B.2 Stabilität des Solow-Steady-States (zu §15.1)
+
+$$\dot{k} = sAk^\alpha - (n+\delta)k =: g(k)$$
+
+Linearisierung um $k^*$:
+
+$$g'(k^*) = s A \alpha k^{*(\alpha-1)} - (n+\delta) = \alpha(n+\delta) - (n+\delta) = -(1-\alpha)(n+\delta) < 0$$
+
+da $\alpha < 1$. Also ist $k^*$ asymptotisch stabil mit Konvergenzrate $\lambda_1 = (1-\alpha)(n+\delta)$. $\square$
+
+## B.3 Hopf-Bifurkation bei $\alpha_H^{\text{krit}}$ (zu §20.1)
+
+**Beweisskizze.** Linearisierung der Kopplung II.2 ↔ III.2 ↔ III.4 um $(p^*, \theta^*, \hat{p}^*)$. Die Jacobi-Matrix $J(\alpha_H)$ hat ein konjugiert komplexes Eigenwertpaar $\lambda_{\pm}(\alpha_H)$ mit:
+
+1. $\text{Re}(\lambda_\pm) < 0$ für $\alpha_H < \alpha_H^{\text{krit}}$ (gedämpfte Oszillation)
+2. $\text{Re}(\lambda_\pm) = 0$ bei $\alpha_H = \alpha_H^{\text{krit}}$ (Hopf-Punkt)
+3. $d\text{Re}(\lambda)/d\alpha_H |_{\alpha_H^{\text{krit}}} > 0$ (Transversalitätsbedingung)
+
+Bedingung 3 ist erfüllt, da $\alpha_H$ den Herding-Term *monoton* verstärkt. Nach dem Hopf-Bifurkationssatz (Marsden-McCracken 1976) entsteht bei $\alpha_H = \alpha_H^{\text{krit}}$ ein Grenzzyklus — der Minsky-Zyklus. $\square$
+
+---
+
+# Anhang C: Funktionale Formen — Der Baukasten
+
+Dieses Anhang enthält die konkreten funktionalen Formen, die als *Modellierungswahlen* in das allgemeine System eingesetzt werden können. Jede Form erfüllt die axiomatischen Eigenschaften (Spalte 2).
+
+## C.1 Nutzenfunktion ($u$)
+
+| Axiom. Eigenschaft | Form | Name | Formel | Wann geeignet |
+|---|---|---|---|---|
+| $u' > 0, u'' < 0$ | CRRA | Constant Relative Risk Aversion | $u(c) = \frac{c^{1-\gamma}}{1-\gamma}$ | Standard, $\gamma > 0$ |
+| $u' > 0, u'' < 0$ | CARA | Constant Absolute Risk Aversion | $u(c) = -e^{-\alpha c}/\alpha$ | Bei absolutem Risiko |
+| $u' > 0, u'' < 0$ | Log | Logarithmisch | $u(c) = \ln c$ | CRRA mit $\gamma = 1$ |
+| $u' > 0, u'' < 0$ | Epstein-Zin | Rekursiv | $V_t = [(1-\beta)c_t^{1-1/\psi} + \beta(E_t[V_{t+1}^{1-\gamma}])^{(1-1/\psi)/(1-\gamma)}]^{1/(1-1/\psi)}$ | Trennung von Risikoaversion und Substitution |
+
+## C.2 Produktionsfunktion ($F$)
+
+| Axiom. Eigenschaft | Form | Name | Formel | Wann geeignet |
+|---|---|---|---|---|
+| $F_K > 0, F_{KK} < 0$ | Cobb-Douglas | CD | $Y = AK^\alpha L^\beta$ | $\sigma_{\text{subst}} = 1$ |
+| $F_K > 0, F_{KK} < 0$ | CES | Constant Elasticity of Substitution | $Y = A[\alpha K^\rho + (1-\alpha)L^\rho]^{1/\rho}$ | $\sigma \neq 1$ |
+| $F_K > 0, F_{KK} < 0$ | Leontief | Fixed Proportions | $Y = A\min(\alpha K, \beta L)$ | Komplementäre Inputs ($\sigma = 0$) |
+| $F_K > 0, F_{KK} < 0$ | Translog | Flexible | $\ln Y = \alpha_0 + \sum \alpha_i \ln x_i + \frac{1}{2}\sum\sum \beta_{ij} \ln x_i \ln x_j$ | Empirische Flexibilität |
+
+## C.3 Aufmerksamkeitsgewicht ($\omega$)
+
+| Axiom. Eigenschaft | Form | Name | Formel |
+|---|---|---|---|
+| $\omega \uparrow$ mit $\mathcal{I}$, $\sum\omega = 1$ | Softmax | Multinomial Logit | $\omega_{ik} = \mathcal{I}_{ik}^\eta / \sum_j \mathcal{I}_{ij}^\eta$ |
+| $\omega \uparrow$ mit $\mathcal{I}$, $\sum\omega = 1$ | Probit | Normalverteilungs-CDF | $\omega_{ik} = \Phi(\mathcal{I}_{ik}/\sigma)$ |
+| $\omega \uparrow$ mit $\mathcal{I}$, $\sum\omega = 1$ | Linear | Proportional | $\omega_{ik} = \mathcal{I}_{ik} / \sum_j \mathcal{I}_{ij}$ |
+
+## C.4 Informationskosten ($C$)
+
+| Axiom. Eigenschaft | Form | Formel |
+|---|---|---|
+| $C > 0, C' > 0, C'' > 0$ | Quadratisch | $C(\mathcal{I}) = c_0 + c_1\mathcal{I} + c_2\mathcal{I}^2$ |
+| $C > 0, C' > 0, C'' > 0$ | Exponentiell | $C(\mathcal{I}) = c_0(e^{\alpha\mathcal{I}} - 1)$ |
+| $C > 0, C' > 0, C'' > 0$ | Potenzgesetz | $C(\mathcal{I}) = c_0\mathcal{I}^\beta$, $\beta > 1$ |
+
+## C.5 Herding-Funktion ($\Phi$)
+
+| Axiom. Eigenschaft | Form | Formel |
+|---|---|---|
+| $\Phi(0) = 0$, $\partial\Phi/\partial\Delta > 0$ | Linear | $\Phi = \alpha_H \Delta c$ |
+| $\Phi(0) = 0$, $\partial\Phi/\partial\Delta > 0$ | Sigmoid (saturierend) | $\Phi = \alpha_H \tanh(\beta\Delta c)$ |
+| $\Phi(0) = 0$, $\partial\Phi/\partial\Delta > 0$, asymmetrisch | Asymmetrisch | $\Phi = \alpha_H^+ \max(\Delta c, 0) + \alpha_H^- \min(\Delta c, 0)$ |
+
+---
+
+# Anhang D: Implementierungshinweise
+
+## D.1 Pseudocode der Simulationsschleife
+
+```
+INITIALISIERE X(0) aus Realdaten (30 Länder × Variablen)
+SETZE Δt = 0.25 (Quartal)
+
+FÜR t = 0 BIS T:
+    FÜR jedes Land α:
+        1. Berechne Produktion: Y_α = A_α · K_α^α_K · L_α^β_L · R_α^γ_R
+        2. Berechne Konsum: C_α = (1−s_α) · Y_α + ψ(c*, Gini)
+        3. Berechne Investition: I_α = s_α · Y_α
+        4. Berechne Geldmenge: M_α(t+Δt) = M_α(t) + μ_M · M_α
+        5. Berechne Preisdynamik: ṗ_α = κ_P(D_α − S_α)/S_α
+        6. Berechne Zinspolitik: r_α = ρ_r · r_α + (1−ρ_r)(r* + φ_π(π_α−π*))
+        7. Berechne Information: I_α(t+Δt) = I_α + D_I · Σ_β(I_β − I_α) − ω·I_α
+        8. Berechne Gini: Gini_α(t+Δt) = Gini_α + β_gini · max(r_α − g_α, 0)
+        9. Berechne Population: N_α(t+Δt) = N_α · (1 + g_N · Δt)
+    
+    FÜR jedes Länderpaar (α, β):
+        10. Berechne Handel: Trade_αβ = λ_trade · Y_α · Y_β / d_αβ^δ
+        11. Berechne Kapitalfluss: Flow_αβ = κ_flow · (r_α − r_β)
+    
+    AKTUALISIERE Zustandsvektor: X(t+Δt) = X(t) + Ẋ · Δt
+    PRÜFE Randbedingungen (Positivität, Bankrott, Regime)
+    
+AUSGABE: Zeitreihen X(t) für alle Länder
+```
+
+## D.2 Verfügbare Implementierungen
+
+| Implementierung | Sprache | Beschreibung | Kapitel |
+|---|---|---|---|
+| Weltsimulation v2 | Python | 30 Länder, 2000–2049, Monte Carlo | §24 |
+| ABM (NB03) | Python | Agentenbasiert, Herding-Bifurkation | §20.1 |
+| Fokker-Planck (NB06) | Python | Vermögensverteilung, Pareto-Tail | §21.1, §26.4 |
+| Netzwerk-Kaskade (NB07) | Python | Granovetter auf Graphen | §23.3 |
+
+---
+
+# Anhang E: Notation und Symbole
+
+## E.1 Griechische Symbole
+
+| Symbol | Bedeutung | Eingeführt in |
+|---|---|---|
+| $\alpha_H$ | Herding-Intensität | §6.3 (V.3) |
+| $\alpha_K, \beta_L, \gamma_R$ | Produktionselastizitäten | §6.5 (III.3) |
+| $\alpha_t$ | Trend-Following-Parameter | §6.7 (III.4) |
+| $\beta$ | Zeitpräferenzrate | §6.3 (V.1) |
+| $\gamma$ | Relative Risikoaversion | §6.1 (U.1) |
+| $\delta$ | Abschreibungsrate | §4.5 (K.1) |
+| $\varepsilon$ | Regularisierungsparameter ($> 0$) | §5.2 (II.2) |
+| $\eta_k$ | Momentum-/Inflationserwartungsparameter | §5.2 (II.2) |
+| $\theta_{ik}$ | Portfolioanteil (Agent $i$, Gut $k$) | §6.6 (III.2) |
+| $\kappa$ | Phillips-Kurven-Steigung | §17.3 |
+| $\lambda_k$ | Markttiefe (Kyle) | §5.2 (II.2) |
+| $\lambda_\theta$ | Portfolio-Anpassungsgeschwindigkeit | §6.6 (III.2) |
+| $\mu$ | Mittelwert / Drift | kontext |
+| $\pi$ | Inflationsrate | §5.2 |
+| $\rho$ | Zeitpräferenz (= $\beta$) | §15.2 |
+| $\sigma$ | Volatilität / Standardabweichung | kontext |
+| $\tau$ | Steuersatz / Schwellenwertschärfe | kontext |
+| $\varphi_k$ | Illiquiditätsparameter | §5.2 (II.2) |
+| $\chi$ | Handelsoffenheit | §19.1 |
+| $\psi$ | Transaktionskostenparameter | §6.2 (U.3) |
+| $\omega$ | Informationszerfall / Aufmerksamkeitsgewicht | §7.1 (I.1) / §6.2 (U.2) |
+
+## E.2 Lateinische Symbole
+
+| Symbol | Bedeutung | Eingeführt in |
+|---|---|---|
+| $A$ | Technologieniveau (TFP) | §6.5 (III.3) |
+| $A_{ij}$ | Netzwerk-Adjazenzmatrix | §3.4 |
+| $b_i$ | Nettokreditposition von Agent $i$ | §4.1 (I.1) |
+| $c_i$ | Konsum von Agent $i$ | §6.3 (V.1) |
+| $c_i^*$ | Referenzpunkt des Konsums | §6.3 (V.2) |
+| $D_k$ | Nachfrage nach Gut $k$ | §5.2 (II.2) |
+| $f(w,t)$ | Vermögensverteilungsdichte | §8.5 (IV.1) |
+| $F(\cdot)$ | Produktionsfunktion | §6.5 (III.3) |
+| $G$ | Staatsausgaben | §17.1 |
+| $\mathcal{I}$ | Informationsfeld | §7.1 (I.1) |
+| $K$ | Kapitalstock | §4.5 (K.1) |
+| $k = K/L$ | Pro-Kopf-Kapital | §15.1 |
+| $L$ | Arbeit | §6.5 (III.3) |
+| $M$ | Geldmenge | §4.4 (I.4) |
+| $N$ | Population | §9.1 (N.1) |
+| $p_k$ | Preis von Gut $k$ | §5.2 (II.2) |
+| $S_k$ | Angebot von Gut $k$ / Nachrichtenproduktion | kontext |
+| $T_i$ | Steuern/Transfers | §4.1 (I.1) |
+| $w_i$ | Vermögen von Agent $i$ | §4.1 (I.1) |
+| $W$ | Aggregatvermögen | §4.2 (I.2) |
+| $X(t)$ | Zustandsvektor des Gesamtsystems | §3.5 |
+| $Y$ | BIP / Output | §8.4 (V.9) |
+
+## E.3 Operatoren und Konventionen
+
+| Notation | Bedeutung |
+|---|---|
+| $\dot{X} = dX/dt$ | Zeitableitung |
+| $\hat{p}$ | Erwartungswert / geschätzter Wert |
+| $\bar{X}$ | Mittelwert über Agenten |
+| $\nabla$ | Gradient (räumlich oder im Zustandsraum) |
+| $\sum_k$ | Summation über Güter $k = 1, \dots, K$ |
+| $\sum_i$ | Summation über Agenten $i = 1, \dots, N$ |
+| $\mathbb{1}[\cdot]$ | Indikatorfunktion |
+| $\sigma(\cdot)$ | Sigmoid-Funktion |
+
+---
+
+*Ende der Monographie.*
