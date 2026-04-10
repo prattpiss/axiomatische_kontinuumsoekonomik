@@ -1,6 +1,6 @@
 # Axiomatische Kontinuumsökonomik
 
-## Eine Vorschlag für eine vollständige ökonomische Theorie aus zehn Axiomen
+## Ein unfertiger Vorschlag für eine vollständige ökonomische Theorie aus zehn Axiomen (Aktuell in Bearbeitung)
 
 ---
 
